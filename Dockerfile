@@ -4,54 +4,71 @@ FROM ubuntu:20.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # 1. Install dependencies
-# 'sudo' is intentionally omitted. 
-# python3/pip are required to run the Jupyter server that hosts the terminal.
+# Added 'zsh' to the list.
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     bash \
+    zsh \
     git \
     nano \
     vim \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Configure Binder User (jovyan)
-# Binder requires a user with UID 1000.
 ARG NB_USER=harry_potter
 ARG NB_UID=1000
 ENV USER ${NB_USER}
 ENV NB_UID ${NB_UID}
 ENV HOME /home/${NB_USER}
-ENV SHELL /bin/bash
+# Set SHELL env to zsh
+ENV SHELL /usr/bin/zsh 
 
 # Create user with UID 1000. 
-# We do NOT add this user to the sudo group or sudoers file.
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
-    --shell /bin/bash \
+    --shell /usr/bin/zsh \
     ${NB_USER}
 
+# CHANGE: Force /bin/sh to point to zsh
+RUN ln -sf /usr/bin/zsh /bin/sh
+
 # 3. Setup File System Requirements
-# Create the "welcome" file
 RUN echo "Welcome to the course workspace." > ${HOME}/welcome
 
-# Configure the login message via .bashrc
-# This will display every time a terminal session is opened.
-RUN echo 'echo "--------------------------------------------------------"' >> ${HOME}/.bashrc && \
-    echo 'echo "LOGGED IN: Ubuntu 20.04 Restricted Environment"' >> ${HOME}/.bashrc && \
-    echo 'echo "Sudo access is disabled for this session."' >> ${HOME}/.bashrc && \
-    echo 'echo "--------------------------------------------------------"' >> ${HOME}/.bashrc
+# Configure .zshrc (instead of .bashrc since we switched shells)
+RUN echo 'echo "--------------------------------------------------------"' >> ${HOME}/.zshrc && \
+    echo 'echo "LOGGED IN: Ubuntu 20.04 Restricted Environment"' >> ${HOME}/.zshrc && \
+    echo 'echo "Sudo access is disabled."' >> ${HOME}/.zshrc && \
+    echo 'echo "--------------------------------------------------------"' >> ${HOME}/.zshrc
 
 # 4. Install Jupyter
-# Required to proxy the web-based terminal.
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir "notebook<7.0.0"
 
-# 5. Finalize Permissions and User
-RUN chown -R ${NB_UID} ${HOME}
+# ==========================================
+# 5. COPY FILES AND SET PERMISSIONS
+# ==========================================
+
+# Copy the local 'hw' folder to the container
+COPY --chown=${NB_UID} hw ${HOME}/hw
+
+# Permission Logic:
+# Step A: Ensure everything is initially owned by the user (so they can read .c and .txt files)
+RUN chown -R ${NB_UID} ${HOME}/hw
+
+# Step B: Find all files starting with "exec" (exec1, exec2...)
+# 1. Change their owner to ROOT.
+# 2. Change permissions to 711 (User can Execute, but NOT Read/Write).
+RUN find ${HOME}/hw -name "exec*" -exec chown root:root {} \; && \
+    find ${HOME}/hw -name "exec*" -exec chmod 711 {} \;
+
+# ==========================================
+
+# Finalize User
 USER ${NB_USER}
 WORKDIR ${HOME}
 
-# Start the Jupyter Notebook server (hosting the terminal)
+# Start Jupyter
 CMD ["jupyter", "notebook", "--ip=0.0.0.0", "--port=8888", "--no-browser"]
