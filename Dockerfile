@@ -43,7 +43,8 @@ RUN echo 'echo "--------------------------------------------------------"' >> ${
 
 # 4. Install Jupyter
 # Required to proxy the web-based terminal.
-RUN pip3 install --no-cache-dir notebook
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir "notebook<7.0.0"
 
 # 5. Finalize Permissions and User
 RUN chown -R ${NB_UID} ${HOME}
