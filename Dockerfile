@@ -17,17 +17,19 @@ RUN apt-get update && apt-get install -y \
 
 # 2. Configure Binder User (jovyan)
 # Binder requires a user with UID 1000.
-ARG NB_USER=jovyan
+ARG NB_USER=harry_potter
 ARG NB_UID=1000
 ENV USER ${NB_USER}
 ENV NB_UID ${NB_UID}
 ENV HOME /home/${NB_USER}
+ENV SHELL /bin/bash
 
 # Create user with UID 1000. 
 # We do NOT add this user to the sudo group or sudoers file.
 RUN adduser --disabled-password \
     --gecos "Default user" \
     --uid ${NB_UID} \
+    --shell /bin/bash \
     ${NB_USER}
 
 # 3. Setup File System Requirements
